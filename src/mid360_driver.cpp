@@ -87,15 +87,13 @@ namespace mid360_driver {
 
     Mid360Driver::~Mid360Driver() {
         stop();
-        asio::error_code error_code;
-        receive_pointcloud_socket.close(error_code);
-        receive_imu_socket.close(error_code);
     }
 
     void Mid360Driver::stop() {
         is_running.store(false, std::memory_order_relaxed);
-        pointcloud_cancel_signal.emit(asio::cancellation_type::all);
-        imu_cancel_signal.emit(asio::cancellation_type::all);
+        asio::error_code error_code;
+        receive_pointcloud_socket.close(error_code);
+        receive_imu_socket.close(error_code);
     }
 
     asio::awaitable<void> Mid360Driver::receive_pointcloud() {
@@ -105,14 +103,8 @@ namespace mid360_driver {
             auto [error_code, bytes_received] = co_await receive_pointcloud_socket.async_receive_from(
                     asio::buffer(buffer, 1400),
                     sender_endpoint,
-                    asio::bind_cancellation_slot(pointcloud_cancel_signal.slot(), asio::as_tuple(asio::use_awaitable)));
-            if (error_code) [[unlikely]] {
-                if (error_code == asio::error::operation_aborted) [[unlikely]] {
-                    break;
-                }
-                continue;
-            }
-            if (sender_endpoint.port() != 56300) [[unlikely]] {
+                    asio::as_tuple(asio::use_awaitable));
+            if (error_code || sender_endpoint.port() != 56300) [[unlikely]] {
                 continue;
             }
             const auto &header = *reinterpret_cast<const DataHeader *>(buffer);
@@ -178,14 +170,8 @@ namespace mid360_driver {
             auto [error_code, bytes_received] = co_await receive_imu_socket.async_receive_from(
                     asio::buffer(buffer, 1400),
                     sender_endpoint,
-                    asio::bind_cancellation_slot(imu_cancel_signal.slot(), asio::as_tuple(asio::use_awaitable)));
-            if (error_code) [[unlikely]] {
-                if (error_code == asio::error::operation_aborted) [[unlikely]] {
-                    break;
-                }
-                continue;
-            }
-            if (sender_endpoint.port() != 56400) [[unlikely]] {
+                    asio::as_tuple(asio::use_awaitable));
+            if (error_code || sender_endpoint.port() != 56400) [[unlikely]] {
                 continue;
             }
             const auto &header = *reinterpret_cast<const DataHeader *>(buffer);

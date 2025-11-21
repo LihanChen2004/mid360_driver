@@ -174,23 +174,23 @@ namespace mid360_driver {
                     }
                 });
         if (is_topic_name_with_lidar_ip) {
-            publish_pointcloud_timer = create_timer(std::chrono::milliseconds(100), [this, lidar_frame]() {
+            publish_pointcloud_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(100), [this, lidar_frame]() {
                 for (auto &[lidar_ip, lidar_publisher]: muti_lidar_publisher) {
                     lidar_publisher.make_sure_init(*this);
                     lidar_publisher.publish_pointcloud(lidar_frame);
                 }
             });
-            publish_imu_timer = create_timer(std::chrono::milliseconds(1), [this, imu_frame]() {
+            publish_imu_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(1), [this, imu_frame]() {
                 for (auto &[lidar_ip, lidar_publisher]: muti_lidar_publisher) {
                     lidar_publisher.make_sure_init(*this);
                     lidar_publisher.publish_imu(imu_frame);
                 }
             });
         } else {
-            publish_pointcloud_timer = create_timer(std::chrono::duration<double, std::ratio<1, 1>>(lidar_publish_time_interval), [this, lidar_frame]() {
+            publish_pointcloud_timer = rclcpp::create_timer(this, get_clock(), std::chrono::duration<double, std::ratio<1, 1>>(lidar_publish_time_interval), [this, lidar_frame]() {
                 lidar_publisher.publish_pointcloud(lidar_frame);
             });
-            publish_imu_timer = create_timer(std::chrono::milliseconds(1), [this, imu_frame]() {
+            publish_imu_timer = rclcpp::create_timer(this, get_clock(), std::chrono::milliseconds(1), [this, imu_frame]() {
                 lidar_publisher.publish_imu(imu_frame);
             });
         }

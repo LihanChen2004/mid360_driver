@@ -33,8 +33,6 @@ namespace mid360_driver {
     class Mid360Driver {
     private:
         std::atomic<bool> is_running = true;
-        asio::cancellation_signal pointcloud_cancel_signal;
-        asio::cancellation_signal imu_cancel_signal;
         asio::ip::address host_ip;
         asio::ip::udp::socket receive_pointcloud_socket;
         asio::ip::udp::socket receive_imu_socket;
