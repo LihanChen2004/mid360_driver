@@ -2,8 +2,6 @@
 
 This is an implementation of the Mid-360 driver, intended to serve as a replacement for [livox_ros_driver2](https://github.com/Livox-SDK/livox_ros_driver2).
 
-The default branch is for ROS2. If you want to run it without ros, please checkout the `main` branch.
-
 <img src="./img/ACE.jpg" width="200px">
 
 ## Install dependencies
@@ -22,6 +20,7 @@ mid360_driver:
         lidar_frame: livox_frame
         imu_topic: /livox/imu
         imu_frame: imu_frame
+        lidar_publish_time_interval: 0.1
         is_topic_name_with_lidar_ip: false # 是否在话题名后面加雷达ip，可以用于区分多个雷达
 ```
 
