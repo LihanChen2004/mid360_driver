@@ -6,6 +6,7 @@
 
 #define _USE_MATH_DEFINES
 #include "mid360_driver.h"
+#include <chrono>
 #include <cmath>
 
 namespace mid360_driver {
@@ -17,20 +18,26 @@ namespace mid360_driver {
         kLivoxLidarSphericalCoordinateData = 0x03
     };
 
+    enum TimestampType : std::uint8_t {
+        kTimestampTypeNoSync = 0,   // 没有同步信号
+        kTimestampTypeGptpOrPtp = 1,// gPTP 或 PTP 同步模式
+        kTimestampTypeGps = 2       // GPS 同步模式
+    };
+
 #pragma pack(1)
 
     struct DataHeader {
-        uint8_t version;       // 包协议版本：当前为0
-        uint16_t length;       // 整个UDP数据段长度
-        uint16_t time_interval;// 帧内点云采样时间(单位0.1us)；这帧点云数据中最后一个点减去第一个点时间
-        uint16_t dot_num;      // 当前UDP包的点数目
-        uint16_t udp_cnt;      // 点云UDP包计数，每个UDP包依次加1，点云帧起始包清0
-        uint8_t frame_cnt;     // 点云帧计数，每帧点云(10Hz/15Hz等)依次加1
-        DataType data_type;    // 数据类型
-        uint8_t time_type;     // 时间戳类型
-        uint8_t reserved[12];  // 保留
-        uint32_t crc32;        // timestamp+点云数据校验码，使用CRC-32算法
-        uint64_t timestamp;    // 点云时间戳，单位: ns
+        uint8_t version;        // 包协议版本：当前为0
+        uint16_t length;        // 整个UDP数据段长度
+        uint16_t time_interval; // 帧内点云采样时间(单位0.1us)；这帧点云数据中最后一个点减去第一个点时间
+        uint16_t dot_num;       // 当前UDP包的点数目
+        uint16_t udp_cnt;       // 点云UDP包计数，每个UDP包依次加1，点云帧起始包清0
+        uint8_t frame_cnt;      // 点云帧计数，每帧点云(10Hz/15Hz等)依次加1
+        DataType data_type;     // 数据类型
+        TimestampType time_type;// 时间戳类型
+        uint8_t reserved[12];   // 保留
+        uint32_t crc32;         // timestamp+点云数据校验码，使用CRC-32算法
+        uint64_t timestamp;     // 点云时间戳，单位: ns
     };
 
     struct Imu {
@@ -109,9 +116,19 @@ namespace mid360_driver {
                 continue;
             }
             const auto &header = *reinterpret_cast<const DataHeader *>(buffer);
+            double header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
+            if (header.time_type == TimestampType::kTimestampTypeNoSync) {
+                auto [iter, inserted] = delta_time_map.try_emplace(sender_endpoint.address());
+                if (inserted) {
+                    header_timestamp += iter->second;
+                } else {
+                    auto now = static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) * 1e-9;
+                    iter->second = now - header_timestamp;
+                    header_timestamp = now;
+                }
+            }
             points.clear();
             points.reserve(header.dot_num);
-            double header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
             if (header.data_type == DataType::kLivoxLidarCartesianCoordinateHighData) {
                 const auto *raw_points = reinterpret_cast<const CartesianHighPoint *>(buffer + sizeof(DataHeader));
                 for (size_t i = 0; i < header.dot_num; ++i) {
@@ -177,9 +194,20 @@ namespace mid360_driver {
                 continue;
             }
             const auto &header = *reinterpret_cast<const DataHeader *>(buffer);
+            double header_timestamp = static_cast<double>(header.timestamp) * 1e-9;
+            if (header.time_type == TimestampType::kTimestampTypeNoSync) {
+                auto [iter, inserted] = delta_time_map.try_emplace(sender_endpoint.address());
+                if (inserted) {
+                    header_timestamp += iter->second;
+                } else {
+                    auto now = static_cast<double>(std::chrono::high_resolution_clock::now().time_since_epoch().count()) * 1e-9;
+                    iter->second = now - header_timestamp;
+                    header_timestamp = now;
+                }
+            }
             const auto &raw_imu = *reinterpret_cast<const Imu *>(buffer + sizeof(DataHeader));
             ImuMsg imu_msg;// NOLINT(cppcoreguidelines-pro-type-member-init)
-            imu_msg.timestamp = static_cast<double>(header.timestamp) * 1e-9;
+            imu_msg.timestamp = header_timestamp;
             imu_msg.angular_velocity_x = raw_imu.angular_velocity_x;
             imu_msg.angular_velocity_y = raw_imu.angular_velocity_y;
             imu_msg.angular_velocity_z = raw_imu.angular_velocity_z;
