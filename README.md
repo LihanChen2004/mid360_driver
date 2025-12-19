@@ -21,7 +21,6 @@ Special note:
 ## Install dependencies
 
 1. Please make sure you have install ROS2.
-2. Install Asio. If you are using ubuntu, you can install by following command: `sudo apt install libasio-dev`
 
 ## Param
 
